@@ -1,0 +1,29 @@
+#!/usr/bin/env perl
+
+# enable taint mode somehow?
+
+#use Modern::Perl;
+use strict;
+use warnings;
+
+use mro     ();
+use feature ();
+
+print q(Getting updated pip packages...);
+open (my $pip, '-|', 'pip list --local --outdated --format freeze')
+  or die "death......\n";
+my @pips= <$pip>;
+close $pip;
+print qq(done.\n);
+
+my $count=0;
+
+for (grep (/^pip==/), @pips, @pips) { # ensure pip is first in the list
+   $count++ && print qq(\n); # newline between each loop, skipping the first
+   if (/^(\w[^=]*)=/) {
+      print qq(==> $_);
+      my $msg= qx(pip install --upgrade $1) or die qq(it ded\n);
+      print $msg;
+   }
+   $_=''; # prevent duplicate invocations if pip needs upgraded
+}
