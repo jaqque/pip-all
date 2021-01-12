@@ -1,29 +1,49 @@
-#!/usr/bin/env perl
+#!/usr/bin/env python
 
-# enable taint mode somehow?
+import json
+import sys
+from subprocess import Popen, PIPE
 
-#use Modern::Perl;
-use strict;
-use warnings;
+def popen(args):
 
-use mro     ();
-use feature ();
+    if major < 3:
+        process = Popen(
+            args,
+            stdout=PIPE, 
+        )
+    else:
+        # either python3 is dumb, and assumes binary
+        # or python2 is dumb and won't accept text=True
+        # honestly, my money is python itself being dumb.
+        # case in point, the : after the else. you need that.
+        process = Popen(
+            args,
+            stdout=PIPE, 
+            text=True,
+        )
+    return process
 
-print q(Getting updated pip packages...);
-open (my $pip, '-|', 'pip list --local --outdated --format freeze')
-  or die "death......\n";
-my @pips= <$pip>;
-close $pip;
-print qq(done.\n);
+major=sys.version_info.major
 
-my $count=0;
+pip_exe="pip"+str(major)
+pip_outdated=[pip_exe, "list", "--local", "--outdated", "--format", "json"]
 
-for (grep (/^pip==/), @pips, @pips) { # ensure pip is first in the list
-   $count++ && print qq(\n); # newline between each loop, skipping the first
-   if (/^(\w[^=]*)=/) {
-      print qq(==> $_);
-      my $msg= qx(pip install --upgrade $1) or die qq(it ded\n);
-      print $msg;
-   }
-   $_=''; # prevent duplicate invocations if pip needs upgraded
-}
+process = popen( pip_outdated )
+(output, err) = process.communicate()
+exit_code = process.wait()
+
+pips=json.loads(output)
+
+for if_pip in pips:
+    if if_pip["name"] == "pip":
+        pips.remove(if_pip)
+        pips.insert(0, if_pip)
+
+for pip in pips:
+    print ("{}({}) ==> {}\n".format(pip["name"], pip["version"], pip["latest_version"]))
+    pip_update = popen( [pip_exe, "install", "--upgrade" ,pip["name"]])
+    (output, err) = pip_update.communicate()
+    exit_code = pip_update.wait()
+    print (output)
+
+sys.exit(0)
