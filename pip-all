@@ -7,6 +7,7 @@ import subprocess
 # stack traces? we don't need no stinkin' strack traces!
 sys.tracebacklimit = 0
 
+
 def popen(args):
     """
     Syntactical sugar for Popen
@@ -18,30 +19,33 @@ def popen(args):
     )
     return process
 
-pip_outdated=[sys.executable, "-m", "pip", "list", "--local", "--outdated", "--format", "json"]
+
+pip_outdated = [sys.executable,
+                "-m", "pip", "list", "--local",
+                "--outdated", "--format", "json"]
 
 sys.stdout.write("Getting updated pip packages...")
 sys.stdout.flush()
 try:
-    process = popen( pip_outdated )
-except:
+    process = popen(pip_outdated)
+except OSError:
     print("ERROR\n\nThat didn't work out too well.")
     sys.exit(1)
 (output, err) = process.communicate()
 exit_code = process.wait()
 if exit_code != 0:
-   print ("ERROR\n\nbro, do you even pip?")
-   sys.exit(exit_code)
-print ("done.\n")
+    print("ERROR\n\nbro, do you even pip?")
+    sys.exit(exit_code)
+print("done.\n")
 
 try:
-    pips=json.loads(output)
-except:
-    print ("Stop feeding me gibberish.")
+    pips = json.loads(output)
+except ValueError:
+    print("Stop feeding me gibberish.")
     sys.exit(1)
 
 if not pips:
-    print ("Nothing to do, you are already updated!")
+    print("Nothing to do, you are already updated!")
     sys.exit(0)
 
 # Shove pip first in the list, if present
@@ -51,7 +55,7 @@ for if_pip in pips:
         pips.insert(0, if_pip)
 
 for pip in pips:
-    print ("{}({}) ==> {}\n".format(
+    print("{}({}) ==> {}\n".format(
         pip["name"],
         pip["version"],
         pip["latest_version"],
@@ -59,9 +63,10 @@ for pip in pips:
     # -n for no-op!
     if "-n" in sys.argv:
         continue
-    pip_update = popen( [sys.executable, "-m", "pip", "install", "--upgrade" ,pip["name"]])
+    pip_update = popen([sys.executable,
+                       "-m", "pip", "install", "--upgrade", pip["name"]])
     (output, err) = pip_update.communicate()
     exit_code = pip_update.wait()
-    print (output.decode())
+    print(output.decode())
 
 sys.exit(0)
