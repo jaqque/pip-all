@@ -1,29 +1,72 @@
-#!/usr/bin/env perl
+#!/usr/bin/env python
 
-# enable taint mode somehow?
+import json
+import sys
+import subprocess
 
-#use Modern::Perl;
-use strict;
-use warnings;
+# stack traces? we don't need no stinkin' strack traces!
+sys.tracebacklimit = 0
 
-use mro     ();
-use feature ();
 
-print q(Getting updated pip packages...);
-open (my $pip, '-|', 'pip list --local --outdated --format freeze')
-  or die "death......\n";
-my @pips= <$pip>;
-close $pip;
-print qq(done.\n);
+def popen(args):
+    """
+    Syntactical sugar for Popen
+    """
+    process = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    return process
 
-my $count=0;
 
-for (grep (/^pip==/), @pips, @pips) { # ensure pip is first in the list
-   $count++ && print qq(\n); # newline between each loop, skipping the first
-   if (/^(\w[^=]*)=/) {
-      print qq(==> $_);
-      my $msg= qx(pip install --upgrade $1) or die qq(it ded\n);
-      print $msg;
-   }
-   $_=''; # prevent duplicate invocations if pip needs upgraded
-}
+pip_outdated = [sys.executable,
+                "-m", "pip", "list", "--local",
+                "--outdated", "--format", "json"]
+
+sys.stdout.write("Getting updated pip packages...")
+sys.stdout.flush()
+try:
+    process = popen(pip_outdated)
+except OSError:
+    print("ERROR\n\nThat didn't work out too well.")
+    sys.exit(1)
+(output, err) = process.communicate()
+exit_code = process.wait()
+if exit_code != 0:
+    print("ERROR\n\nbro, do you even pip?")
+    sys.exit(exit_code)
+print("done.\n")
+
+try:
+    pips = json.loads(output)
+except ValueError:
+    print("Stop feeding me gibberish.")
+    sys.exit(1)
+
+if not pips:
+    print("Nothing to do, you are already updated!")
+    sys.exit(0)
+
+# Shove pip first in the list, if present
+for if_pip in pips:
+    if if_pip["name"] == "pip":
+        pips.remove(if_pip)
+        pips.insert(0, if_pip)
+
+for pip in pips:
+    print("{}({}) ==> {}\n".format(
+        pip["name"],
+        pip["version"],
+        pip["latest_version"],
+    ))
+    # -n for no-op!
+    if "-n" in sys.argv:
+        continue
+    pip_update = popen([sys.executable,
+                       "-m", "pip", "install", "--upgrade", pip["name"]])
+    (output, err) = pip_update.communicate()
+    exit_code = pip_update.wait()
+    print(output.decode())
+
+sys.exit(0)
